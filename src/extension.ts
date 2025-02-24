@@ -1,4 +1,3 @@
-
 /* IMPORT */
 
 import * as vscode from 'vscode';
@@ -12,6 +11,9 @@ import ChangesDecorator from './todo/decorators/changes';
 import Utils from './utils';
 import ViewEmbedded from './views/embedded';
 import ViewFiles from './views/files';
+
+// Import node-fetch (ensure it's installed via npm)
+import fetch from 'node-fetch';
 
 /* ACTIVATE */
 
@@ -63,7 +65,10 @@ const activate = function ( context: vscode.ExtensionContext ) {
     vscode.languages.registerDocumentSymbolProvider ( Consts.languageId, new SymbolsProvider () ),
     vscode.window.onDidChangeActiveTextEditor ( () => DocumentDecorator.update () ),
     vscode.workspace.onDidChangeConfiguration ( Consts.update ),
-    vscode.workspace.onDidChangeConfiguration ( () => delete Utils.files.filesData && Utils.embedded.provider && delete Utils.embedded.provider.filesData ),
+    vscode.workspace.onDidChangeConfiguration ( () => {
+      delete Utils.files.filesData;
+      if ( Utils.embedded.provider ) delete Utils.embedded.provider.filesData;
+    }),
     vscode.workspace.onDidChangeConfiguration ( () => DocumentDecorator.update () ),
     vscode.workspace.onDidChangeConfiguration ( Utils.statistics.tokens.updateDisabledAll ),
     vscode.workspace.onDidChangeTextDocument ( ChangesDecorator.onChanges ),
@@ -74,10 +79,66 @@ const activate = function ( context: vscode.ExtensionContext ) {
 
   DocumentDecorator.update ();
 
-  return Utils.init.commands ( context );
+  // Register the new Trello integration command.
+  const disposableTrello = vscode.commands.registerCommand('todoPlus.sendTodoToTrello', async () => {
+    // Prompt the user for the todo title and description.
+    const title = await vscode.window.showInputBox({ prompt: 'Enter todo title' });
+    if (!title) {
+      vscode.window.showErrorMessage('Title is required.');
+      return;
+    }
+    const description = await vscode.window.showInputBox({ prompt: 'Enter todo description' });
+    const todo = { title, description: description || '' };
 
+    try {
+      await sendTodoToTrello(todo);
+      vscode.window.showInformationMessage('Todo sent to Trello successfully!');
+    } catch (error) {
+      vscode.window.showErrorMessage('Failed to send todo to Trello. See console for details.');
+      console.error(error);
+    }
+  });
+  context.subscriptions.push(disposableTrello);
+
+  return Utils.init.commands ( context );
 };
+
+/* HELPER FUNCTION: Trello Integration */
+
+async function sendTodoToTrello(todo: { title: string, description: string }): Promise<void> {
+  // Get configuration from the workspace settings under "todoPlus"
+  const config = vscode.workspace.getConfiguration('todoPlus');
+  const trelloKey = config.get<string>('trello.key');
+  const trelloToken = config.get<string>('trello.token');
+  const listId = config.get<string>('trello.listId');
+
+  if (!trelloKey || !trelloToken || !listId) {
+    throw new Error('Trello configuration is missing. Please set your API key, token, and list ID in the settings.');
+  }
+
+  // Construct the Trello API URL and request body.
+  const url = `https://api.trello.com/1/cards?key=${trelloKey}&token=${trelloToken}`;
+  const body = {
+    idList: listId,
+    name: todo.title,
+    desc: todo.description
+  };
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Error creating Trello card: ${response.statusText}. Details: ${errorText}`);
+  }
+
+  const data = await response.json();
+  console.log('Trello card created:', data);
+}
 
 /* EXPORT */
 
-export {activate};
+export { activate };
