@@ -3,7 +3,7 @@
   "displayName": "Todo+",
   "description": "Manage todo lists with ease. Powerful, easy to use and customizable.",
   "icon": "resources/logo/logo-128x128.png",
-  "version": "4.19.1",
+  "version": "4.20.1",
   "license": "MIT",
   "main": "out/extension.js",
   "publisher": "fabiospampinato",
@@ -628,6 +628,21 @@
           "type": "boolean",
           "description": "Show icons next to todos and types",
           "default": true
+        },
+        "todo.trello.key": {
+          "type": "string",
+          "default": "",
+          "description": "Your Trello API key"
+        },
+        "todo.trello.token": {
+          "type": "string",
+          "default": "",
+          "description": "Your Trello API token"
+        },
+        "todo.trello.listId": {
+          "type": "string",
+          "default": "",
+          "description": "The Trello List ID where cards will be created."
         }
       }
     },
@@ -809,6 +824,12 @@
         "key": "Shift+Ctrl+a",
         "mac": "Shift+Cmd+a",
         "when": "editorTextFocus && editorLangId == todo"
+      },
+      {
+        "command": "todo.sendTodoToTrello",
+        "title": "Send Todo to Trello",
+        "key": "Shift+Ctrl+t",
+        "mac": "Shift+Cmd+t"
       }
     ],
     "views": {
