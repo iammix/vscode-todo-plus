@@ -80,13 +80,9 @@ const activate = function ( context: vscode.ExtensionContext ) {
   DocumentDecorator.update ();
 
   // Register the new Trello integration command.
-  const disposableTrello = vscode.commands.registerCommand('todoPlus.sendTodoToTrello', async () => {
+  const disposableTrello = vscode.commands.registerCommand('todo.sendTodoToTrello', async () => {
     // Prompt the user for the todo title and description.
-    const title = await vscode.window.showInputBox({ prompt: 'Enter todo title' });
-    if (!title) {
-      vscode.window.showErrorMessage('Title is required.');
-      return;
-    }
+    const title = '';
     const description = await vscode.window.showInputBox({ prompt: 'Enter todo description' });
     const todo = { title, description: description || '' };
 
@@ -104,22 +100,34 @@ const activate = function ( context: vscode.ExtensionContext ) {
 };
 
 /* HELPER FUNCTION: Trello Integration */
-
 async function sendTodoToTrello(todo: { title: string, description: string }): Promise<void> {
-  // Get configuration from the workspace settings under "todoPlus"
-  const config = vscode.workspace.getConfiguration('todoPlus');
+  const activeEditor = vscode.window.activeTextEditor;
+  if (!activeEditor) {
+    vscode.window.showErrorMessage('No active text editor found.');
+    return;
+  }
+  const currentLine = activeEditor.selection.active.line;
+  const lineText = activeEditor.document.lineAt(currentLine).text.trim();
+  if (!lineText) {
+    vscode.window.showErrorMessage('The current line is empty.');
+    return;
+  }
+  todo.title = lineText;
+
+  const config = vscode.workspace.getConfiguration('todo');
   const trelloKey = config.get<string>('trello.key');
   const trelloToken = config.get<string>('trello.token');
-  const listId = config.get<string>('trello.listId');
 
-  if (!trelloKey || !trelloToken || !listId) {
-    throw new Error('Trello configuration is missing. Please set your API key, token, and list ID in the settings.');
+  // Backlog list ID as obtained from your Trello GET request
+  const backlogListId = '67b5e0aad106cc49950f173c';
+
+  if (!trelloKey || !trelloToken) {
+    throw new Error('Trello configuration is missing. Please set your API key and token in settings.');
   }
 
-  // Construct the Trello API URL and request body.
   const url = `https://api.trello.com/1/cards?key=${trelloKey}&token=${trelloToken}`;
   const body = {
-    idList: listId,
+    idList: backlogListId,
     name: todo.title,
     desc: todo.description
   };
@@ -136,8 +144,9 @@ async function sendTodoToTrello(todo: { title: string, description: string }): P
   }
 
   const data = await response.json();
-  console.log('Trello card created:', data);
+  console.log('Trello card created in Backlog:', data);
 }
+
 
 /* EXPORT */
 
